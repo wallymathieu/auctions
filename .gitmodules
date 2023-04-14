@@ -1,0 +1,9 @@
+[submodule "auctions-api-simple"]
+	path = csharp/auctions-api
+	url = git@github.com:wallymathieu/auctions-api-simple.git
+[submodule "fsharp/auctions-api"]
+	path = fsharp/auctions-api
+	url = git@github.com:wallymathieu/auctions-site.git
+[submodule "haskell/auctions-api"]
+	path = haskell/auctions-api
+	url = git@github.com:wallymathieu/auctions-site-haskell.git
