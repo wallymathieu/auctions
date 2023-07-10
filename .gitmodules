@@ -7,3 +7,6 @@
 [submodule "haskell/auctions-api"]
 	path = haskell-api
 	url = git@github.com:wallymathieu/auctions-site-haskell.git
+[submodule "clojure-api"]
+	path = clojure-api
+	url = git@github.com:wallymathieu/auctions-api-clojure.git
