@@ -10,3 +10,6 @@
 [submodule "clojure-api"]
 	path = clojure-api
 	url = git@github.com:wallymathieu/auctions-api-clojure.git
+[submodule "go-api"]
+	path = go-api
+	url = git@github.com:wallymathieu/auctions-api-go.git
