@@ -13,3 +13,6 @@
 [submodule "go-api"]
 	path = go-api
 	url = git@github.com:wallymathieu/auctions-api-go.git
+[submodule "fsharp-mainstream-api"]
+	path = fsharp-mainstream-api
+	url = git@github.com:wallymathieu/auctions-api-fsharp-mainstream.git
