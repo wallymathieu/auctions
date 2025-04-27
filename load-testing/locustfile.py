@@ -36,7 +36,7 @@ class CreateAuctions(HttpUser):
         #print(f"Starts at: {starts_at_iso}, Ends at: {ends_at_iso}")
         #for i in range(10000):
         auction_id = random.getrandbits(63)
-        self.client.post(f"/auction", name="create_auction", json={
+        self.client.post(f"/auctions", name="create_auction", json={
             "id": auction_id,
             "startsAt": starts_at_iso,
             "endsAt": ends_at_iso,
@@ -66,16 +66,15 @@ class CreateAuctions(HttpUser):
             if not check_auction_expiry_and_start(auction):
                 continue
             #amount = random.getrandbits(10)
-            auction_response = self.client.get(f"/auction/{auction["id"]}", name="get_auction")
+            auction_response = self.client.get(f"/auctions/{auction["id"]}", name="get_auction")
             auction = auction_response.json()
             highest_bid = auction["bids"][0] if auction["bids"] else None
             if highest_bid:
-                (currency,amount) = parse_bid_amount(highest_bid["amount"])
-                amount = int(amount) + 50
+                amount = int(highest_bid["amount"]) + 50
             else:
                 amount = random.getrandbits(3)
-            response = self.client.post(f"/auction/{auction["id"]}/bid", name="post_bid_to_auction", json={
-                "amount": f"{auction["currency"]}{amount}",
+            response = self.client.post(f"/auctions/{auction["id"]}/bid", name="post_bid_to_auction", json={
+                "amount": amount,
             }, headers={
                 "x-jwt-payload": "eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K",
                 "Content-Type": "application/json"
