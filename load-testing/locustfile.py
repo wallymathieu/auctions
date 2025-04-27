@@ -73,7 +73,7 @@ class CreateAuctions(HttpUser):
                 amount = int(highest_bid["amount"]) + 50
             else:
                 amount = random.getrandbits(3)
-            response = self.client.post(f"/auctions/{auction["id"]}/bid", name="post_bid_to_auction", json={
+            response = self.client.post(f"/auctions/{auction["id"]}/bids", name="post_bid_to_auction", json={
                 "amount": amount,
             }, headers={
                 "x-jwt-payload": "eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K",
