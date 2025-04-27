@@ -68,9 +68,10 @@ class CreateAuctions(HttpUser):
             #amount = random.getrandbits(10)
             auction_response = self.client.get(f"/auctions/{auction["id"]}", name="get_auction")
             auction = auction_response.json()
-            highest_bid = auction["bids"][0] if auction["bids"] else None
+            bid_amounts = [int(bid["amount"]) for bid in auction["bids"]]
+            highest_bid = max(bid_amounts) if bid_amounts else None
             if highest_bid:
-                amount = int(highest_bid["amount"]) + 50
+                amount = highest_bid + 50
             else:
                 amount = random.getrandbits(3)
             response = self.client.post(f"/auctions/{auction["id"]}/bids", name="post_bid_to_auction", json={
