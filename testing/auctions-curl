@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Curl equivalents of the Postman 'AuctionSite' v2 requests
+
+set -euo pipefail
+
+URL=${URL:-"http://127.0.0.1:8080"}
+SELLER=${SELLER:-"eyJzdWIiOiJhMSIsICJuYW1lIjoiVGVzdCIsICJ1X3R5cCI6IjAifQo="}
+BUYER=${BUYER:-"eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K"}
+
+usage(){
+  cat <<EOF
+Usage: $0 <command>
+
+Commands:
+  create-auction   Create an example auction (POST /auctions)
+  place-bid        Place a bid on an auction (POST /auctions/:id/bids). Usage: place-bid [auction_id] [amount]
+  list-auctions    GET /auctions (auth header)
+  help             Show this help
+
+Environment variables accepted: URL, SELLER, BUYER
+Example:
+  URL=http://localhost:8080 SELLER=eyJzdWIiOiJhMSIsICJuYW1lIjoiVGVzdCIsICJ1X3R5cCI6IjAifQo= BUYER=eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K bash $0 create-auction
+
+  URL=http://localhost:8080 bash $0 create-auction
+EOF
+}
+
+serial_request(){
+  # Helper to pretty-print results.
+  # Accepts either a filename or '-' to read the body from stdin.
+  status="$1"
+  bodysrc="$2"
+  echo "---- ${status} ----"
+
+  if [ "$bodysrc" = "-" ]; then
+    # read from stdin
+    if [ -t 0 ]; then
+      # nothing on stdin
+      echo "(no body)"
+      return
+    fi
+    if command -v jq >/dev/null 2>&1; then
+      jq . - || cat -
+    else
+      cat -
+    fi
+    return
+  fi
+
+  if [ -n "$bodysrc" ] && [ -f "$bodysrc" ] && [ -s "$bodysrc" ]; then
+    if command -v jq >/dev/null 2>&1; then
+      jq . "$bodysrc" || cat "$bodysrc"
+    else
+      cat "$bodysrc"
+    fi
+  else
+    echo "(no body)"
+  fi
+}
+
+create_auction(){
+  # build dynamic startsAt and endsAt (UTC)
+  startsAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  endsAt=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)
+
+  read -r -d '' payload <<EOF || true
+{
+  "id": 1,
+  "startsAt": "${startsAt}",
+  "endsAt": "${endsAt}",
+  "title": "Some auction",
+  "currency": "VAC"
+}
+EOF
+
+  # Send payload on stdin to curl and capture both body and status without files
+  resp=$(curl -sS -X POST "${URL%/}/auctions" \
+    -H "Content-Type: application/json" \
+    -H "x-jwt-payload: ${SELLER}" \
+    --data-binary @- -w "\n%{http_code}" <<< "$payload")
+
+  # last line is the HTTP status code, the rest is the body
+  http_code=$(printf '%s' "$resp" | tail -n1)
+  body=$(printf '%s' "$resp" | sed '$d')
+
+  echo "HTTP status: $http_code"
+  # print body by piping it into serial_request which reads from stdin when '-' is passed
+  printf '%s' "$body" | serial_request "Created (or other)" -
+}
+
+
+place_bid(){
+  # allow positional args: place-bid [auction_id] [amount]
+  # fallback order: CLI args -> env AUCTION / AMOUNT -> defaults (1 / 11)
+  auction_id=${1:-${AUCTION:-1}}
+  amount=${2:-${AMOUNT:-11}}
+
+  read -r -d '' bidpayload <<EOF || true
+{ "auction":"${auction_id}","amount":${amount} }
+EOF
+
+  resp=$(curl -sS -X POST "${URL%/}/auctions/${auction_id}/bids" \
+    -H "Content-Type: application/json" \
+    -H "x-jwt-payload: ${BUYER}" \
+    --data-binary @- -w "\n%{http_code}" <<< "$bidpayload")
+
+  http_code=$(printf '%s' "$resp" | tail -n1)
+  body=$(printf '%s' "$resp" | sed '$d')
+
+  echo "HTTP status: $http_code"
+  echo "(auction: ${auction_id}, amount: ${amount})"
+  printf '%s' "$body" | serial_request "Place bid response" -
+}
+
+list_auctions(){
+  resp=$(curl -sS -X GET "${URL%/}/auctions" \
+    -H "x-jwt-payload: ${BUYER}" -w "\n%{http_code}" ) || true
+
+  http_code=$(printf '%s' "$resp" | tail -n1)
+  body=$(printf '%s' "$resp" | sed '$d')
+
+  echo "HTTP status: $http_code"
+  printf '%s' "$body" | serial_request "Auctions list" -
+}
+
+case ${1:-help} in
+  create-auction)
+    create_auction
+    ;;
+  place-bid)
+    # pass remaining args (auction_id, amount) to the function
+    place_bid "${@:2}"
+    ;;
+  list-auctions)
+    list_auctions
+    ;;
+  help|*)
+    usage
+    ;;
+esac
