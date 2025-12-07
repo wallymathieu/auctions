@@ -14,6 +14,7 @@ Usage: $0 <command>
 Commands:
   create-auction   Create an example auction (POST /auctions)
   place-bid        Place a bid on an auction (POST /auctions/:id/bids). Usage: place-bid [auction_id] [amount]
+  show-auction     Show a specific auction (GET /auctions/:id). Usage: show-auction [auction_id]
   list-auctions    GET /auctions (auth header)
   help             Show this help
 
@@ -112,6 +113,22 @@ EOF
   printf '%s' "$body" | serial_request "Place bid response" -
 }
 
+show_auction(){
+  # allow positional arg: show-auction [auction_id]
+  # fallback order: CLI args -> env AUCTION -> default (1)
+  auction_id=${1:-${AUCTION:-1}}
+
+  resp=$(curl -sS -X GET "${URL%/}/auctions/${auction_id}" \
+    -H "x-jwt-payload: ${BUYER}" -w "\n%{http_code}" ) || true
+
+  http_code=$(printf '%s' "$resp" | tail -n1)
+  body=$(printf '%s' "$resp" | sed '$d')
+
+  echo "HTTP status: $http_code"
+  echo "(auction_id: ${auction_id})"
+  printf '%s' "$body" | serial_request "Auction details" -
+}
+
 list_auctions(){
   resp=$(curl -sS -X GET "${URL%/}/auctions" \
     -H "x-jwt-payload: ${BUYER}" -w "\n%{http_code}" ) || true
@@ -130,6 +147,10 @@ case ${1:-help} in
   place-bid)
     # pass remaining args (auction_id, amount) to the function
     place_bid "${@:2}"
+    ;;
+  show-auction)
+    # pass remaining args (auction_id) to the function
+    show_auction "${@:2}"
     ;;
   list-auctions)
     list_auctions
