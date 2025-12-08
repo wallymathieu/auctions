@@ -51,13 +51,11 @@ def create_auction():
     ends_at = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     payload = {
-        "id": 1,
         "startsAt": starts_at,
         "endsAt": ends_at,
         "title": "Some auction",
         "currency": "VAC"
     }
-
     url = f"{URL.rstrip('/')}/auctions"
     headers = {
         "Content-Type": "application/json",
