@@ -8,7 +8,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     import requests
@@ -47,8 +47,9 @@ def print_response(status_label, body, http_code=None):
 def create_auction():
     """Create an example auction (POST /auctions)."""
     # Build dynamic startsAt and endsAt (UTC)
-    starts_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    ends_at = (datetime.utcnow() + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc)
+    starts_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ends_at = (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     payload = {
         "startsAt": starts_at,
