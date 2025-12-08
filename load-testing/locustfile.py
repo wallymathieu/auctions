@@ -5,6 +5,9 @@ import uuid
 import random
 import re
 
+seller = "eyJzdWIiOiJhMSIsICJuYW1lIjoiVGVzdCIsICJ1X3R5cCI6IjAifQo="
+buyer = "eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K"
+
 def convert_to_iso_format(dt):
     return dt.isoformat()[:-9]+'Z'
 def check_auction_expiry_and_start(auction):
@@ -43,7 +46,7 @@ class CreateAuctions(HttpUser):
             "title": "Some auction",
             "currency": "VAC"
         }, headers={
-            "x-jwt-payload": "eyJzdWIiOiJhMSIsICJuYW1lIjoiVGVzdCIsICJ1X3R5cCI6IjAifQo=",
+            "x-jwt-payload": seller,
             "Content-Type": "application/json"
         })
 
@@ -77,7 +80,7 @@ class CreateAuctions(HttpUser):
             response = self.client.post(f"/auctions/{auction["id"]}/bids", name="post_bid_to_auction", json={
                 "amount": amount,
             }, headers={
-                "x-jwt-payload": "eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K",
+                "x-jwt-payload": buyer,
                 "Content-Type": "application/json"
             })
             if response.status_code == 200:
