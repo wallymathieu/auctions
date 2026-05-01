@@ -3,6 +3,12 @@ API conformance tests ported from haskell-api/test/ApiSpec.hs.
 
 Covers the HTTP surface shared by all auction API implementations.
 Configure the target with the URL environment variable (default: http://127.0.0.1:8080).
+
+cd testing && source testing/bin/activate
+pytest test_api.py -v
+
+# Against a different URL:
+URL=http://localhost:9000 pytest test_api.py -v
 """
 
 import os
