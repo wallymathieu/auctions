@@ -59,6 +59,7 @@ def auction_payload(auction_id: int) -> dict:
         "endsAt": ends_at,
         "title": "First auction",
         "currency": "VAC",
+        "open": True
     }
 
 
