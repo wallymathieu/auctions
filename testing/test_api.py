@@ -159,3 +159,44 @@ class TestAddBids:
         assert response.status_code == 400
         error = response.json()
         assert error["type"] == "SellerCannotPlaceBids"
+
+
+class TestAuctionTiming:
+    """Ported from AuctionStateSpecs.hs incrementSpec and EnglishAuctionSpec.hs timing tests."""
+
+    def test_cannot_bid_before_auction_starts(self, client, auction_id):
+        """Corresponds to 'cant bid before auction starts' in EnglishAuctionSpec.hs."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Future auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        assert response.status_code == 400
+        error = response.json()
+        assert error["type"] == "AuctionHasNotStarted"
+        assert error["auctionId"] == auction_id
+
+    def test_cannot_bid_on_ended_auction(self, client, auction_id):
+        """Corresponds to 'will have ended just after end' in AuctionStateSpecs.hs."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ended auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        assert response.status_code == 400
+        error = response.json()
+        assert error["type"] == "AuctionHasEnded"
+        assert error["auctionId"] == auction_id
+
