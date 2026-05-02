@@ -150,7 +150,8 @@ class TestAddBids:
         # auction_id was never created
         response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
         assert response.status_code == 404
-        assert "Auction not found" in response.text
+        error = response.json()
+        assert error["type"] == "AuctionNotFound"
 
     def test_seller_cannot_bid_on_own_auction(self, client, auction_id):
         client.post("/auctions", auction_payload(auction_id), SELLER)
