@@ -113,6 +113,14 @@ class TestAddAuction:
         assert isinstance(auctions, list)
         assert any(a["id"] == auction_id for a in auctions)
 
+    def test_get_nonexistent_auction_returns_404(self, client, auction_id):
+        response = client.get(f"/auctions/{auction_id}")
+        assert response.status_code == 404
+
+    def test_create_auction_without_auth_returns_401(self, client, auction_id):
+        response = client.post("/auctions", auction_payload(auction_id))
+        assert response.status_code == 401
+
 
 class TestAddBids:
     """Ported from addBidSpec in haskell-api/test/ApiSpec.hs"""
@@ -143,3 +151,10 @@ class TestAddBids:
         response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
         assert response.status_code == 404
         assert "Auction not found" in response.text
+
+    def test_seller_cannot_bid_on_own_auction(self, client, auction_id):
+        client.post("/auctions", auction_payload(auction_id), SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 11}, SELLER)
+        assert response.status_code == 400
+        error = response.json()
+        assert error["type"] == "SellerCannotPlaceBids"
