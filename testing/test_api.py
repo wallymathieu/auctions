@@ -91,7 +91,9 @@ class TestAddAuction:
         client.post("/auctions", payload, SELLER)
         response = client.post("/auctions", payload, SELLER)
         assert response.status_code == 400
-        assert f"AuctionAlreadyExists {auction_id}" in response.text
+        error = response.json()
+        assert error["type"] == "AuctionAlreadyExists"
+        assert error["auctionId"] == auction_id
 
     def test_returns_added_auction(self, client, auction_id):
         client.post("/auctions", auction_payload(auction_id), SELLER)
