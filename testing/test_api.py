@@ -121,6 +121,36 @@ class TestAddAuction:
         response = client.post("/auctions", auction_payload(auction_id))
         assert response.status_code == 401
 
+    def test_cannot_add_auction_that_has_already_ended(self, client, auction_id):
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ended auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        response = client.post("/auctions", payload, SELLER)
+        assert response.status_code == 400
+        error = response.json()
+        assert error["type"] == "AuctionHasEnded"
+        assert error["auctionId"] == auction_id
+
+    def test_ended_auction_is_not_stored(self, client, auction_id):
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ended auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        response = client.get(f"/auctions/{auction_id}")
+        assert response.status_code == 404
+
 
 class TestAddBids:
     """Ported from addBidSpec in haskell-api/test/ApiSpec.hs"""
