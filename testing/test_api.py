@@ -188,15 +188,66 @@ class TestAuctionTiming:
         payload = {
             "id": auction_id,
             "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "title": "Ended auction",
+            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ending soon auction",
             "currency": "VAC",
             "open": True,
         }
         client.post("/auctions", payload, SELLER)
+        time.sleep(3)
         response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
         assert response.status_code == 400
         error = response.json()
         assert error["type"] == "AuctionHasEnded"
         assert error["auctionId"] == auction_id
+
+    def test_bid_accepted_just_after_auction_starts(self, client, auction_id):
+        """Corresponds to 'wont end just after start' in AuctionStateSpecs.hs."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Just started auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        assert response.status_code == 200
+
+    def test_bid_accepted_just_before_auction_ends(self, client, auction_id):
+        """Corresponds to 'wont end just before end' in AuctionStateSpecs.hs."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Nearly ended auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        assert response.status_code == 200
+
+    def test_ended_auction_stays_ended(self, client, auction_id):
+        """Corresponds to 'can increment twice' in AuctionStateSpecs.hs — ended state is stable."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ending soon auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        time.sleep(3)
+        first = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        second = client.post(f"/auctions/{auction_id}/bids", {"amount": 20}, BUYER)
+        assert first.status_code == 400
+        assert first.json()["type"] == "AuctionHasEnded"
+        assert second.status_code == 400
+        assert second.json()["type"] == "AuctionHasEnded"
 
