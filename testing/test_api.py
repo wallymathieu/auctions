@@ -190,6 +190,21 @@ class TestAddBids:
         error = response.json()
         assert error["type"] == "SellerCannotPlaceBids"
 
+    def test_cannot_bid_lower_than_highest_bid(self, client, auction_id):
+        """Corresponds to "can't place bid lower than highest bid" in EnglishAuctionSpec.hs."""
+        client.post("/auctions", auction_payload(auction_id), SELLER)
+        client.post(f"/auctions/{auction_id}/bids", {"amount": 20}, BUYER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10}, BUYER)
+        assert response.status_code == 400
+        error = response.json()
+        assert error["type"] == "MustPlaceBidOverHighestBid"
+        assert error["amount"] == 20
+
+    def test_bid_without_auth_returns_401(self, client, auction_id):
+        client.post("/auctions", auction_payload(auction_id), SELLER)
+        response = client.post(f"/auctions/{auction_id}/bids", {"amount": 10})
+        assert response.status_code == 401
+
 
 class TestAuctionTiming:
     """Ported from AuctionStateSpecs.hs incrementSpec and EnglishAuctionSpec.hs timing tests."""
@@ -280,4 +295,24 @@ class TestAuctionTiming:
         assert first.json()["type"] == "AuctionHasEnded"
         assert second.status_code == 400
         assert second.json()["type"] == "AuctionHasEnded"
+
+    def test_winner_visible_after_auction_ends(self, client, auction_id):
+        """Corresponds to 'can get winner and price from an auction' in EnglishAuctionSpec.hs."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": auction_id,
+            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "title": "Ending soon auction",
+            "currency": "VAC",
+            "open": True,
+        }
+        client.post("/auctions", payload, SELLER)
+        client.post(f"/auctions/{auction_id}/bids", {"amount": 42}, BUYER)
+        time.sleep(3)
+        response = client.get(f"/auctions/{auction_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "a2" in data["winner"]
+        assert data["winnerPrice"] == 42
 
