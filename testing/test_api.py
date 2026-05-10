@@ -12,6 +12,7 @@ URL=http://localhost:9000 pytest test_api.py -v
 """
 
 import os
+import random
 import time
 import pytest
 import requests
@@ -21,14 +22,15 @@ from typing import Optional
 BASE_URL = os.environ.get("URL", "http://127.0.0.1:8080")
 SELLER = os.environ.get("SELLER", "eyJzdWIiOiJhMSIsICJuYW1lIjoiVGVzdCIsICJ1X3R5cCI6IjAifQo=")
 BUYER = os.environ.get("BUYER", "eyJzdWIiOiJhMiIsICJuYW1lIjoiQnV5ZXIiLCAidV90eXAiOiIwIn0K")
-
-_counter = int(time.time() * 1000) % 1_000_000
+DEFAULT_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", "10"))
 
 
 def unique_id() -> int:
-    global _counter
-    _counter += 1
-    return _counter
+    return random.randint(1, 2**53)
+
+
+def format_utc(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
 class ApiClient:
@@ -36,27 +38,28 @@ class ApiClient:
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
 
+    def close(self):
+        self.session.close()
+
     def get(self, path: str, jwt_payload: Optional[str] = None) -> requests.Response:
         headers = {}
         if jwt_payload:
             headers["x-jwt-payload"] = jwt_payload
-        return self.session.get(f"{self.base_url}{path}", headers=headers)
+        return self.session.get(f"{self.base_url}{path}", headers=headers, timeout=DEFAULT_TIMEOUT)
 
     def post(self, path: str, data: dict, jwt_payload: Optional[str] = None) -> requests.Response:
         headers = {"Content-Type": "application/json"}
         if jwt_payload:
             headers["x-jwt-payload"] = jwt_payload
-        return self.session.post(f"{self.base_url}{path}", json=data, headers=headers)
+        return self.session.post(f"{self.base_url}{path}", json=data, headers=headers, timeout=DEFAULT_TIMEOUT)
 
 
 def auction_payload(auction_id: int) -> dict:
     now = datetime.now(timezone.utc)
-    starts_at = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    ends_at = (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     return {
         "id": auction_id,
-        "startsAt": starts_at,
-        "endsAt": ends_at,
+        "startsAt": format_utc(now - timedelta(hours=2)),
+        "endsAt": format_utc(now + timedelta(hours=2)),
         "title": "First auction",
         "currency": "VAC",
         "open": True
@@ -65,7 +68,9 @@ def auction_payload(auction_id: int) -> dict:
 
 @pytest.fixture
 def client():
-    return ApiClient()
+    c = ApiClient()
+    yield c
+    c.close()
 
 
 @pytest.fixture
@@ -125,8 +130,8 @@ class TestAddAuction:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now - timedelta(hours=2)),
             "title": "Ended auction",
             "currency": "VAC",
             "open": True,
@@ -141,8 +146,8 @@ class TestAddAuction:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now - timedelta(hours=2)),
             "title": "Ended auction",
             "currency": "VAC",
             "open": True,
@@ -214,8 +219,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now + timedelta(hours=2)),
+            "endsAt": format_utc(now + timedelta(hours=4)),
             "title": "Future auction",
             "currency": "VAC",
             "open": True,
@@ -232,8 +237,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now + timedelta(seconds=2)),
             "title": "Ending soon auction",
             "currency": "VAC",
             "open": True,
@@ -251,8 +256,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(seconds=1)),
+            "endsAt": format_utc(now + timedelta(hours=4)),
             "title": "Just started auction",
             "currency": "VAC",
             "open": True,
@@ -266,8 +271,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now + timedelta(minutes=10)),
             "title": "Nearly ended auction",
             "currency": "VAC",
             "open": True,
@@ -281,8 +286,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now + timedelta(seconds=2)),
             "title": "Ending soon auction",
             "currency": "VAC",
             "open": True,
@@ -301,8 +306,8 @@ class TestAuctionTiming:
         now = datetime.now(timezone.utc)
         payload = {
             "id": auction_id,
-            "startsAt": (now - timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "endsAt": (now + timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "startsAt": format_utc(now - timedelta(hours=4)),
+            "endsAt": format_utc(now + timedelta(seconds=2)),
             "title": "Ending soon auction",
             "currency": "VAC",
             "open": True,
